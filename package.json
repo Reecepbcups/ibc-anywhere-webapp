@@ -31,5 +31,11 @@
 		"vite": "^4.0.0",
 		"vitest": "^0.25.3"
 	},
-	"type": "module"
+	"type": "module",
+	"dependencies": {
+		"@cosmjs/stargate": "^0.29.5",
+		"@cosmos-kit/keplr": "^0.32.14",
+		"chain-registry": "^1.6.0",
+		"cosmjs-types": "^0.6.1"
+	}
 }

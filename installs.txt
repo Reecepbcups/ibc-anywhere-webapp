@@ -1,0 +1,8 @@
+
+# gets all chains we need to make it easy for what we want to transfer
+# https://github.com/cosmology-tech/chain-registry
+npm install chain-registry
+
+
+# keplr
+# https://github.com/cosmology-tech/cosmos-kit/tree/main/packages/keplr
