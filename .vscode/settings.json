@@ -10,6 +10,6 @@
         "**/.project": true,
         "**/.settings": true,
         "**/.factorypath": true,
-        "**/node_modules": false
+        "**/node_modules": true
     }
 }

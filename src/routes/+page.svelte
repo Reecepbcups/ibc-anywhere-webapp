@@ -13,8 +13,8 @@
     import { SigningStargateClient } from "@cosmjs/stargate";
         
     // https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts
-    import { assets, chains, ibc } from 'chain-registry';
-    import type { IBCInfo } from '@chain-registry/types';    
+    import { assets, chains, ibc } from 'chain-registry';            
+    import type { IBCInfo } from '@chain-registry/types';
 
     let chain_input: string;
     let to_chain_input: string;
@@ -70,7 +70,7 @@
         
         
         
-        // try 10 different endpoints
+        // try 10 different endpoints max
         for(let i = 0; i < 10; i++) {
             try {            
                 from_client = await SigningStargateClient.connectWithSigner(chain_rpc[i].address, wallet, {prefix: chain.bech32_prefix})  
@@ -83,7 +83,7 @@
         }      
         
         if(from_client === undefined) {
-            throw new Error("Client not found")
+            throw new Error("RPC with CORS not found, Client can not be created")
         }
         
         // get the from balance of addr    
@@ -103,37 +103,7 @@
 
         document.getElementById("denoms_to_send")!.style.display = "block";
     }
-
-    // This returns idx 0->20 max, why?
-    // osmosis has a cosmoshub channel, but not found here
-    // const get_all_channels = (chain_name: String) => {
-    //     // does this need to be async?
-    //     let channels: IBCInfo[] = []        
-    //     for(const channel of ibc) {
-    //         if(channel.chain_1.chain_name === chain_name) {
-    //             channels = [...channels, channel]
-    //         }
-    //     }
-    //     return channels
-    // }
-
-    // const get_channel = async (from_name: String, to_name: String, version: String, port_id: String) => {
-    //     // version example: ics20-1
-    //     // see if the from chainid has a matching to_chainid from in the ibc variable                
-    //     for(const info of get_all_channels(from_name)) {            
-    //         if(info.chain_2.chain_name === to_name) {                                                      
-    //             for(const channel of info.channels) {
-    //                 if(channel.version === version && channel.chain_1.port_id === port_id) {
-    //                     return channel.chain_1.channel_id
-    //                 }                
-    //             }
-    //         }
-    //     }
-    //     return undefined
-    // }
-
-    // create an interface for name, channel_id, port_id
-
+    
     interface Channel {
         name: string,
         channel_id: string,
@@ -293,9 +263,17 @@
         {/each}
     </datalist>
 
-    <div id="denoms_to_send" style="display: none;">
-        <input type="text" placeholder="Denom to send" list="denoms" bind:value={ibc_denom}>
+    <div id="denoms_to_send" style="display: none;">   
+                     
         <input type="number" placeholder="Amount" bind:value={ibc_amount}>
+        
+        <!-- create a select input box of list denoms -->
+        <select bind:value={ibc_denom}>            
+            <option value="" disabled selected>Select a Denom</option>
+            {#each users_balances as balance, i}                
+                <option value={balance.denom}>{balance.denom}</option>
+            {/each}
+        </select>
 
         <h4>To Chain</h4>
         <input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input}>
