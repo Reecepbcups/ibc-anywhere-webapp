@@ -12,27 +12,18 @@
         
     import { SigningStargateClient } from "@cosmjs/stargate";
         
+    // https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts
     import { assets, chains, ibc } from 'chain-registry';
-    import type { IBCInfo } from '@chain-registry/types';
+    import type { IBCInfo } from '@chain-registry/types';    
 
-        
-    // Q: Why does this not work? only returns 0->20 max, not the 45+     
-    // let final: any[] = [];
-    // for(const info of ibc) {
-    //     if(info.chain_1.chain_name === "osmosis") {
-    //         final = [...final, info]
-    //     }
-    // }
-    // console.log(final)
-
-    let chain_input: String;
-    let to_chain_input: String;
+    let chain_input: string;
+    let to_chain_input: string;
     let users_balances: Coin[] = [];
 
     // let enabled_channels: string[] = []; // set when we load the users first wallet, this way we only show exacts
 
-    const channel_version: String = "ics20-1";
-    const port_id: String = "transfer";
+    const channel_version: string = "ics20-1";
+    const port_id: string = "transfer";
     let gas = 250000;
 
     let ibc_denom: string;
@@ -115,41 +106,86 @@
 
     // This returns idx 0->20 max, why?
     // osmosis has a cosmoshub channel, but not found here
-    const get_all_channels = (chain_name: String) => {
-        // does this need to be async?
-        let channels: IBCInfo[] = []        
+    // const get_all_channels = (chain_name: String) => {
+    //     // does this need to be async?
+    //     let channels: IBCInfo[] = []        
+    //     for(const channel of ibc) {
+    //         if(channel.chain_1.chain_name === chain_name) {
+    //             channels = [...channels, channel]
+    //         }
+    //     }
+    //     return channels
+    // }
+
+    // const get_channel = async (from_name: String, to_name: String, version: String, port_id: String) => {
+    //     // version example: ics20-1
+    //     // see if the from chainid has a matching to_chainid from in the ibc variable                
+    //     for(const info of get_all_channels(from_name)) {            
+    //         if(info.chain_2.chain_name === to_name) {                                                      
+    //             for(const channel of info.channels) {
+    //                 if(channel.version === version && channel.chain_1.port_id === port_id) {
+    //                     return channel.chain_1.channel_id
+    //                 }                
+    //             }
+    //         }
+    //     }
+    //     return undefined
+    // }
+
+    // create an interface for name, channel_id, port_id
+
+    interface Channel {
+        name: string,
+        channel_id: string,
+        version: string, // ics20-1
+        port_id: string // transfer
+    }    
+
+    const get_all_channel_pairs = (from_name: string): Channel[] => {
+        const matches: Channel[] = []        
+
         for(const channel of ibc) {
-            if(channel.chain_1.chain_name === chain_name) {
-                channels = [...channels, channel]
+            const c = channel.channels[0] // why channel 0
+            
+            if(channel.chain_1.chain_name === from_name) {                
+                matches.push({
+                    name: channel.chain_2.chain_name,           
+                    channel_id: c.chain_1.channel_id,
+                    port_id: c.chain_1.port_id,
+                    version: c.version
+                })
+            } else if (channel.chain_2.chain_name === from_name) {
+                
+                matches.push({
+                    name: channel.chain_1.chain_name,           
+                    channel_id: c.chain_2.channel_id,
+                    port_id: c.chain_2.port_id,
+                    version: c.version
+                })
             }
-        }
-        return channels
+        }        
+        return matches
     }
 
-    const get_channel = async (from_name: String, to_name: String, version: String, port_id: String) => {
-        // version example: ics20-1
-        // see if the from chainid has a matching to_chainid from in the ibc variable                
-        for(const info of get_all_channels(from_name)) {            
-            if(info.chain_2.chain_name === to_name) {                                                      
-                for(const channel of info.channels) {
-                    if(channel.version === version && channel.chain_1.port_id === port_id) {
-                        return channel.chain_1.channel_id
-                    }                
-                }
+    // get_all_channel_pairs("cosmoshub")
+
+    const get_channel = (from_name: string, to_name: string): string => {
+        const pairs = get_all_channel_pairs(from_name)
+
+        // todo; add version & port_id in the future
+        
+        for(const pair of pairs) {
+            if(pair.name === to_name) {
+                return pair.channel_id
             }
         }
-        return undefined
+
+        return "";
     }
 
-    // get_channel("cosmoshub", "osmosis", "ics20-1", "transfer").then((channel) => {
-    //     console.log(channel)
-    // })    
-    // get_channel("osmosis", "cosmoshub", "ics20-1", "transfer").then((channel) => {
-    //     console.log(channel)
-    // })    
-
-    // const all = get_all_channels("osmosis")    
-    // console.log(all)
+    // debugging
+    // const pairs = get_all_channel_pairs("osmosis")
+    // console.log(pairs)    
 
     const ibc_transfer = async () =>  {
         // use sendIbcTokens from stargate client
@@ -189,25 +225,16 @@
         const to_wallet = signer(to_chain.chain_id)
         const to_wallet_addr = (await to_wallet.getAccounts())[0].address        
 
-        // const client = await SigningStargateClient.connectWithSigner(chain_rpc[0].address, wallet, {prefix: chain.bech32_prefix})
-
-        // client.sendTokens(addr, addr, [{denom: "uatom", amount: "100"}], {amount: [], gas: "500000"}).then((tx) => {
-        //     console.log(tx)
-        // });
-        
-
-        
-
         // get current time in seconds
         const current_time = Math.floor(Date.now() / 1000)        
         const timeout_time = current_time + 100
 
-        const channel_id = await get_channel(chain.chain_name, to_chain.chain_name, channel_version, port_id) // ex: channel-141
-        if(channel_id === undefined) {
+
+        const channel_id = get_channel(chain.chain_name, to_chain.chain_name) // ex: channel-141
+        if(channel_id === undefined || channel_id === "") {
             alert(`There is no IBC channel for ${chain.chain_name} -> ${to_chain.chain_name} with version ${channel_version} and port_id ${port_id}`)
             throw new Error("Channel not found")
-        }
-        // console.log(channel_id)
+        }        
 
         // alert here that they are going to do XYZ for XYZ, allow gas change price, then send
 
@@ -215,10 +242,9 @@
             throw new Error("from_client not found")
         }
 
-        from_client.sendIbcTokens(addr, to_wallet_addr, {denom: ibc_denom, amount: ibc_amount.toString()}, "transfer", channel_id, undefined, timeout_time, {amount: [], gas: gas.toString()}, "IBC-Anywhere by Reece").then((tx) => {
+        from_client.sendIbcTokens(addr, to_wallet_addr, {denom: ibc_denom, amount: ibc_amount.toString()}, port_id, channel_id, undefined, timeout_time, {amount: [], gas: gas.toString()}, `IBC-Anywhere by Reece | from ${chain.pretty_name} to ${to_chain.pretty_name}`).then((tx) => {
             console.log(tx)
             // popup a little green modle here in the future
-
             alert(`Transaction submited, Code: ${tx.code} Tx: ${tx.transactionHash} (also in console)`)
         });
     }
