@@ -8,7 +8,8 @@
     - Dockerize
     - Remove redundant code, such as the open keplr window. Make easy utils
     - Better design. animations?
-    - Auto convert IBC denoms to their human readable versions, including exponents        
+    - Auto convert IBC denoms to their human readable versions, including exponents
+    - Mobile Support
 -->
 
 <script lang="ts">   
@@ -240,9 +241,8 @@
 
 
 <h1>IBC Anywhere</h1>
-<p>Easily IBC token transfer from and to any chain in 5 clicks  (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
+<p>Easily IBC token transfer from and to any chain in 5 clicks (Desktop only right now)  (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
 <p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
-
 
 <!-- async, for chain in chains output it as a p -->
 {#await chains}
@@ -268,6 +268,7 @@
         <div id="from_chain" class="div_center"> 
 
             <h3>From Chain</h3>
+            <p>Type the chain you want and select in in the dropdown box</p>
             <input id="chain_input" type="text" placeholder="from chain-id" list="chain_names" bind:value={chain_input}>       
             <br>
             <!-- <input id="gasAmount" type="number" placeholder="Gas Amount" step="100" pattern="\d*" bind:value={gas}> gas     -->
