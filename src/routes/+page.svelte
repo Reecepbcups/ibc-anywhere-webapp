@@ -19,8 +19,7 @@
         
     // https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts
     // import type { IBCInfo } from '@chain-registry/types';
-    import { assets, chains, ibc } from 'chain-registry';            
-	import { WASMD_NODE } from "$env/static/private";
+    import { assets, chains, ibc } from 'chain-registry';	
 
     let chain_input: string;
     let to_chain_input: string;
