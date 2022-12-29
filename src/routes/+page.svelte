@@ -218,7 +218,22 @@
         from_client.sendIbcTokens(addr, to_wallet_addr, {denom: ibc_denom, amount: ibc_amount.toString()}, port_id, channel_id, undefined, timeout_time, {amount: [], gas: gas.toString()}, `IBC-Anywhere by Reece | from ${chain.pretty_name} to ${to_chain.pretty_name}`).then((tx) => {
             console.log(tx)
             // popup a little green modle here in the future
-            alert(`Transaction submited, Code: ${tx.code} Tx: ${tx.transactionHash} (also in console)`)
+            // alert(`Transaction submited, Code: ${tx.code} Tx: ${tx.transactionHash} (also in console)`)
+
+
+            // get element by id past_txs, and add a new list item with the transaction hash and code id
+            const past_txs = document.getElementById("past_txs_ul")
+            if(past_txs === null) {
+                throw new Error("past_txs not found")
+            }
+
+            const li = document.createElement("li")
+            li.innerHTML = `Code: ${tx.code} | ${chain.pretty_name} TxHash: ${tx.transactionHash}`
+            past_txs.appendChild(li)
+
+            // set past_txs
+            // localStorage.setItem("past_txs", past_txs.innerHTML)
+            document.getElementById("successful_txs")!.style.display = "block";      
         });
     }
 </script>
@@ -290,6 +305,12 @@
             <input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input}>            
             <input type="submit" on:click={() => ibc_transfer()}>
         </div>
+
+        <div id="successful_txs" style="display: none;" class="div_center"> 
+            <ul id="past_txs_ul">
+            </ul>
+        </div>
+        
      </center>
 
      
