@@ -319,7 +319,7 @@
          
 {/await}
 
-<style>
+<style>    
     h1, p {
         text-align: center;
     }
