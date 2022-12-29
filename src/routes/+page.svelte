@@ -212,6 +212,16 @@
             throw new Error("from_client not found")
         }
 
+        // ensuere ibc_denom ibc_amount is not > balances
+        for(const balance of users_balances) {
+            if(balance.denom === ibc_denom) {
+                if(Number(balance.amount) < ibc_amount) {
+                    alert(`You do not have enough\n${ibc_denom} to send\n${ibc_amount}`)
+                    throw new Error("Not enough balance")
+                }
+            }
+        }
+
         from_client.sendIbcTokens(addr, to_wallet_addr, {denom: ibc_denom, amount: ibc_amount.toString()}, port_id, channel_id, undefined, timeout_time, {amount: [], gas: gas.toString()}, `IBC-Anywhere by Reece | from ${chain.pretty_name} to ${to_chain.pretty_name}`).then((tx) => {
             console.log(tx)
             // popup a little green modle here in the future
@@ -221,83 +231,122 @@
 </script>
 
 
-<!-- button which calls connectToChain -->
-<!-- <button on:click={connectToChain}>Connect to Chain</button> -->
-
-<!-- <h1>{chain_input} -> {to_chain_input}</h1> -->
-
 <h1>IBC Anywhere</h1>
 
 <!-- async, for chain in chains output it as a p -->
 {#await chains}
     <p>loading...</p>
 {:then chains}
-    <!-- {#each chains as chain}
-        <li>{chain.pretty_name}</li>
-    {/each} -->
 
-    <!-- an input drop down and text box which auto fills to the values in chains.pretty_name.lower() --> 
-    
-    <h4>From Chain</h4>
-    <input type="text" placeholder="from chain-id" list="chain_names" bind:value={chain_input}>       
-    <br>
-    <input id="gasAmount" type="number" placeholder="Gas Amount" step="100" pattern="\d*" bind:value={gas}> gas    
-    
-    <!-- Connects the wallet to the current chain, then we will show the user more information. -->
-    <br>
-    <input type="submit" value="Connect Wallet" on:click={() => connect_wallet_get_balances()}>
-
-    <!-- li of users_balances -->
-    <ul>
-        {#each users_balances as balance}
-        <!-- if denom starts with ibc/, we need to decode the ibc-trace -->
-            <!-- {#if } -->
-            <li>{balance.amount} {balance.denom}</li>
-        {/each}
-    </ul>
-
-    <!-- datalist of users_balances -->
-    <datalist id="denoms">
+     <!-- datalist of users_balances -->
+     <datalist id="denoms">
         {#each users_balances as balance}
             <option value={balance.denom}>{balance.denom}</option>
         {/each}
     </datalist>
 
-    <div id="denoms_to_send" style="display: none;">   
-                     
-        <input type="number" placeholder="Amount" bind:value={ibc_amount}>
-        
-        <!-- create a select input box of list denoms -->
-        <select bind:value={ibc_denom}>            
-            <option value="" disabled selected>Select a Denom</option>
-            {#each users_balances as balance, i}                
-                <option value={balance.denom}>{balance.denom}</option>
-            {/each}
-        </select>
-
-        <h4>To Chain</h4>
-        <input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input}>
-        <input type="submit" on:click={() => ibc_transfer()}>
-    </div>
-
-        
-    <!-- <input type="text" placeholder="Tokens To Send" list="" bind:value={}>          -->
-    <!-- <input type="submit" on:click={() => connectToChain()}> -->
-
-
-    <!-- a submit button or when they press enter, connect to keplr function, passing through the input from the text box above-->    
-        
+    <!-- chain names & match with chain_id value -->
     <datalist id="chain_names">
-        {#each chains as chain}
-            <!-- make the value the chain id? -->
+        {#each chains as chain}            
             <option value={chain.chain_id}>{chain.pretty_name}</option> 
         {/each}
-    </datalist>        
+    </datalist>  
+
+     <!-- code -->
+
+     <center>
+        <div id="from_chain" class="div_center"> 
+
+            <h3>From Chain</h3>
+            <input id="chain_input" type="text" placeholder="from chain-id" list="chain_names" bind:value={chain_input}>       
+            <br>
+            <!-- <input id="gasAmount" type="number" placeholder="Gas Amount" step="100" pattern="\d*" bind:value={gas}> gas     -->
+            
+            <!-- Connects the wallet to the current chain, then we will show the user more information. -->
+            <br>
+            <input type="submit" value="Connect Wallet" on:click={() => connect_wallet_get_balances()}>        
+        </div>
+    
+        
+    
+        <div id="denoms_to_send" style="display: none;" class="div_center">   
+    
+            <!-- li of users_balances -->
+            <h3>balances</h3>
+            <ul>
+                {#each users_balances as balance}
+                <!-- if denom starts with ibc/, we need to decode the ibc-trace -->
+                    <!-- {#if } -->
+                    <li>{balance.amount} {balance.denom}</li>
+                {/each}
+            </ul>
+                         
+            <input type="number" placeholder="Amount" bind:value={ibc_amount}>
+            
+            <!-- create a select input box of list denoms -->        
+            <select bind:value={ibc_denom}>            
+                <option value="" disabled selected>Select a Denom</option>
+                {#each users_balances as balance, i}                
+                    <option value={balance.denom}>{balance.denom}</option>
+                {/each}
+            </select>
+    
+            <h4>To Chain</h4>
+            <input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input}>
+            <input type="submit" on:click={() => ibc_transfer()}>
+        </div>
+     </center>
+
+     
+
+            
+         
 {/await}
 
- <!-- requests keplr connection -->
-<!-- <button on:click={connectKeplr}>Connect to Keplr</button> -->
+<style>
+    h1 {
+        text-align: center;
+    }
+       
+    .div_center {
+        border: 1px solid black;
+        padding: 10px;
+        margin: 10px;
+        max-width: 50%;
+        float: none !important; 
+        text-align: center;        
+    }    
 
+    ul {
+        list-style: none;        
+    }
 
-<!-- <h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation</p> -->
+    li {                        
+        margin: 10px;
+    }
+
+    /* make buttons green, with larger text */
+    input[type=submit] {
+        background-color: #4CAF50;
+        color: white;
+        padding: 16px 32px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;        
+        border-radius: 8px;
+    }
+    
+    input[type=text], input[type=number], select {
+        width: 25%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;        
+    }    
+
+</style>
