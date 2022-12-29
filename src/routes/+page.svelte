@@ -20,6 +20,10 @@
 	import type { OfflineAminoSigner } from '@cosmjs/amino';
 	import type { OfflineDirectSigner } from '@cosmjs/proto-signing';
 
+	// use cosmos kit for wallets instead of base keplr
+	// https://github.com/cosmology-tech/cosmos-kit/blob/main/packages/example/pages/_app.tsx
+	// import { wallets as keplrWallet } from "@cosmos-kit/keplr";	
+
 	import toast, { Toaster } from 'svelte-french-toast';    
 
 	import type { ToastOptions } from 'svelte-french-toast';
@@ -332,6 +336,11 @@
 </center>
 
 <style>
+
+	* {
+		font-family: 'Nunito Sans', sans-serif;
+	}
+
 	:global(body) {
 		background-color: #ffffff;
 	}
@@ -358,10 +367,10 @@
 
 	li {
 		margin: 10px;
-	}
+	}	
 
 	input[type='submit'] {
-		background-color: blue;
+		background-color: #5e72e4;
 		color: white;
 		padding: 16px 32px;
 		text-align: center;
