@@ -20,11 +20,9 @@
     let to_chain_input: string;
     let users_balances: Coin[] = [];
 
-    // let enabled_channels: string[] = []; // set when we load the users first wallet, this way we only show exacts
-
     const channel_version: string = "ics20-1";
     const port_id: string = "transfer";
-    let gas = 250000;
+    let gas = 300000;
 
     let ibc_denom: string;
     let ibc_amount: number;    
@@ -100,7 +98,6 @@
         console.log(users_balances)
 
         // set the id of denoms_to_send to display show
-
         document.getElementById("denoms_to_send")!.style.display = "block";
     }
     
@@ -112,12 +109,12 @@
     }    
 
     const get_all_channel_pairs = (from_name: string): Channel[] => {
-        const matches: Channel[] = []        
+        const matches: Channel[] = []
 
         for(const channel of ibc) {
             const c = channel.channels[0] // why channel 0
             
-            if(channel.chain_1.chain_name === from_name) {                
+            if(channel.chain_1.chain_name === from_name) {
                 matches.push({
                     name: channel.chain_2.chain_name,           
                     channel_id: c.chain_1.channel_id,
@@ -125,7 +122,6 @@
                     version: c.version
                 })
             } else if (channel.chain_2.chain_name === from_name) {
-                
                 matches.push({
                     name: channel.chain_1.chain_name,           
                     channel_id: c.chain_2.channel_id,
@@ -152,10 +148,6 @@
 
         return "";
     }
-
-    // debugging
-    // const pairs = get_all_channel_pairs("osmosis")
-    // console.log(pairs)    
 
     const ibc_transfer = async () =>  {
         // use sendIbcTokens from stargate client
@@ -232,6 +224,7 @@
 
 
 <h1>IBC Anywhere</h1>
+<p>Easily IBC token transfer from and to any chain in 5 clicks  (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
 
 <!-- async, for chain in chains output it as a p -->
 {#await chains}
@@ -251,7 +244,6 @@
             <option value={chain.chain_id}>{chain.pretty_name}</option> 
         {/each}
     </datalist>  
-
      <!-- code -->
 
      <center>
@@ -292,7 +284,7 @@
             </select>
     
             <h4>To Chain</h4>
-            <input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input}>
+            <input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input}>            
             <input type="submit" on:click={() => ibc_transfer()}>
         </div>
      </center>
@@ -304,7 +296,7 @@
 {/await}
 
 <style>
-    h1 {
+    h1, p {
         text-align: center;
     }
        
