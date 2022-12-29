@@ -1,20 +1,26 @@
+<!-- 
+    Reece Williams | Dec 2022 | IBCAnywhere
+    - Easily transfer a token denom from one chain to another in 5 clicks
+    - Abstracts away the complexity of channels for the average user    
 
-
+    TODO:
+    - Only show channels for the to-chain which from-chain has a connection too
+    - Dockerize
+    - Remove redundant code, such as the open keplr window. Make easy utils
+    - Better design. animations?
+    - Auto convert IBC denoms to their human readable versions, including exponents        
+-->
 
 <script lang="ts">   
     import type { Window as KeplrWindow } from "@keplr-wallet/types";
-
-    // load stargate client from cosmjs
-    // import { StargateClient } from "@cosmjs/stargate";     
-    // import type {OfflineSigner} from "@cosmjs/proto-signing";         
-    import type { Coin } from "cosmjs-types/cosmos/base/v1beta1/coin";
-
-        
+       
+    import type { Coin } from "cosmjs-types/cosmos/base/v1beta1/coin";        
     import { SigningStargateClient } from "@cosmjs/stargate";
         
     // https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts
+    // import type { IBCInfo } from '@chain-registry/types';
     import { assets, chains, ibc } from 'chain-registry';            
-    import type { IBCInfo } from '@chain-registry/types';
+	import { WASMD_NODE } from "$env/static/private";
 
     let chain_input: string;
     let to_chain_input: string;
@@ -27,9 +33,8 @@
     let ibc_denom: string;
     let ibc_amount: number;    
 
-    // let from_chain: OfflineSigner;
-
-    let from_client: SigningStargateClient | undefined;
+    
+    let from_client: SigningStargateClient | undefined;    
     
     // async function connectToChain
     const connect_wallet_get_balances = async () => {
@@ -37,8 +42,7 @@
             alert(`From chain not selected`)
             throw new Error("Chain not found")
         }
-
-        // const chain_id = "cosmoshub-4"        
+        
         const chain = chains.find(chain => chain.chain_id === chain_input)
 
         if(chain === undefined) {
@@ -65,9 +69,7 @@
         wallet.getAccounts().then((accounts) => {
             console.log('accounts', accounts)
         })            
-        
-        
-        
+                    
         // try 10 different endpoints max
         for(let i = 0; i < 10; i++) {
             try {            
@@ -189,7 +191,7 @@
 
         // get current time in seconds
         const current_time = Math.floor(Date.now() / 1000)        
-        const timeout_time = current_time + 100
+        const timeout_time = current_time + 300 // 5 minutes
 
 
         const channel_id = get_channel(chain.chain_name, to_chain.chain_name) // ex: channel-141
@@ -204,7 +206,7 @@
             throw new Error("from_client not found")
         }
 
-        // ensuere ibc_denom ibc_amount is not > balances
+        // ensurer ibc_denom ibc_amount is not > balances
         for(const balance of users_balances) {
             if(balance.denom === ibc_denom) {
                 if(Number(balance.amount) < ibc_amount) {
@@ -225,6 +227,8 @@
 
 <h1>IBC Anywhere</h1>
 <p>Easily IBC token transfer from and to any chain in 5 clicks  (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
+<p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
+
 
 <!-- async, for chain in chains output it as a p -->
 {#await chains}
@@ -254,8 +258,8 @@
             <br>
             <!-- <input id="gasAmount" type="number" placeholder="Gas Amount" step="100" pattern="\d*" bind:value={gas}> gas     -->
             
-            <!-- Connects the wallet to the current chain, then we will show the user more information. -->
             <br>
+            <!-- Connects the wallet to the current chain, then we will show the user more information. -->
             <input type="submit" value="Connect Wallet" on:click={() => connect_wallet_get_balances()}>        
         </div>
     
