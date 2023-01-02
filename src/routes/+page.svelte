@@ -53,7 +53,7 @@
 
 	const get_wallet_for_chain = async (
 		chain_id: string
-	): Promise<OfflineAminoSigner & OfflineDirectSigner> => {
+	): Promise<OfflineAminoSigner | OfflineDirectSigner> => {
 		if (chain_input === undefined) {
 			toast.error(`From chain not selected`, toast_style);
 			throw new Error('Chain not found');
@@ -66,7 +66,7 @@
 			throw new Error('Keplr not found');
 		}
 
-		let signer = keplr.getOfflineSigner;
+		let signer = keplr.getOfflineSignerAuto;
 		if (signer === undefined) {
 			throw new Error('Keplr not found');
 		}
