@@ -283,7 +283,7 @@
 <!-- main website code -->
 <h1>IBC Anywhere</h1>
 <p>Easily IBC token transfer from and to any chain in 5 clicks (Desktop only right now) (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
-<p><b>No ledger support yet, working on this</b></p>
+<p><b>Includes Ledger Support (as of Jan 1st)</b></p>
 <p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
 
 <center>
