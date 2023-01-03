@@ -38,13 +38,11 @@
 		position: 'top-right',
 		duration: 6000,
 		style: 'background: #333; color: #fff; width: 15%; font-size: 1.1rem;'
-	};    
+	};    	
 
-	let final_denom_storage: any = {}; // "ustars": { ibc, channel } (or '')
-
-	let chain_input: string;
+	let chain_input: string; // chain-id
 	let to_chain_input: string;
-	let users_balances: Coin[] = [];
+	// let users_balances: Coin[] = [];
 
 	const channel_version: string = 'ics20-1';
 	const port_id: string = 'transfer';
@@ -52,6 +50,12 @@
 
 	let ibc_denom: string;
 	let ibc_amount: number;
+
+	// if we need to hop channels (ex: osmosis -> stargaze -> umme dex, we will fill this with the channel)
+	// Only applies if we send an ibc/ denom, and if said denoms path does not match the to-chain channel # correct?
+	let channel_hop: string = ""; 
+
+	let balances: Balance[] = [];
 
 	let from_client: SigningStargateClient | undefined;
 
@@ -115,19 +119,46 @@
 
 		// get the from balance of addr
 		// assign read only from await client.getAllBalances(addr) to user_balancecs Coin[]
-		const balances = await from_client.getAllBalances((await wallet.getAccounts())[0].address);
-		// console.log(balances)
-
-		// TODO: convert IBC denoms over to their human readable versions here? Just make a new Coin		
+		const _bals = await from_client.getAllBalances((await wallet.getAccounts())[0].address);
+		// console.log(balances)		
 		
-		// set the global users_balances to balances
-		let new_balances: Coin[] = [];
-		for (const balance of balances) {			let converted_balance = 
-			// let new_coin = Coin.fromJSON({denom: "test", amount: "1000000000000000000"})
-			new_balances.push(balance);
-		}
-		users_balances = new_balances;
-		console.log(users_balances);
+		// set the global users_balances to balances		
+		balances = []
+		for (const b of _bals) {
+			// instead get all denoms from the chain in the future so it only requires 1 query
+			if (b.denom.includes('ibc/')) {				
+				// get the human readable name
+				await get_ibc_denom_human_readable(chain_input, b.denom).then((denom_trace) => {
+					if (denom_trace !== undefined) {
+						balances.push({
+							denom: denom_trace.baseDenom,
+							amount: b.amount,
+							ibc_trace: b.denom, // so we know what we are actually sending
+							channel: denom_trace.path,
+						});
+					}
+				}).catch((error) => {
+					// its possible you send a denom to another chain which does not have it
+					// Ex: Osmosis DEX stars -> Cosmos Hub - breaks since CosmosHub is not relaying with stars
+					// So push it as ibc_trace for the Denom name, oh well
+					console.log(error);
+					balances.push({
+						denom: b.denom,
+						amount: b.amount,						
+					});
+				})
+			} else {
+				balances.push({
+					denom: b.denom,
+					amount: b.amount,
+				});
+			}
+		}		
+
+		// update it for Svelte
+		balances = [...balances]
+
+		console.log(balances);
 
 		// set the id of denoms_to_send to display show
 		document.getElementById('denoms_to_send')!.style.display = 'block';
@@ -233,7 +264,7 @@
 		}
 
 		// ensurer ibc_denom ibc_amount is not > balances
-		for (const balance of users_balances) {
+		for (const balance of balances) {
 			if (balance.denom === ibc_denom) {
 				if (Number(balance.amount) < ibc_amount) {
 					toast.error(`You do not have ${ibc_amount} ${ibc_denom}`, toast_style);
@@ -270,6 +301,111 @@
 			});        
 	};
 
+	// If a user presses to 'Hop Transfer' then we get the channel_id from the denom, send it to that from current chain, and then make another popup to send to said chain
+	// origin_channel_id is from the denom itself when we queried it to send it back to origin
+	// final_hop_chain is the actual chain they wanted to send it to, this time we do it natively tho
+	const ibc_transfer_channel_hop = async (origin_chain: string, origin_channel_id: string, final_hop_chain: string, call_number: number = 0) => {
+
+		if(call_number >= 2) {
+			toast.error(`Too Many Hops (>=2)`, toast_style);
+			throw new Error('Too many hops');
+		}
+
+		// TODO: fix this logic tomorrow not tested and no way it is right.
+
+		// use sendIbcTokens from stargate client
+		// const chain_id = "cosmoshub-4"
+		const chain = chains.find((chain) => chain.chain_id === origin_chain);
+		if (chain === undefined) {
+			toast.error(`From chain ${chain_input} not found`, toast_style);
+			throw new Error('Chain not found');
+		}
+
+		// const to_chain_id = "osmosis-1"
+		const to_chain = chains.find((chain) => chain.chain_id === final_hop_chain);
+		if (to_chain === undefined) {
+			toast.error(`Middlware chain ${temp_to_chain} not found`, toast_style);
+			throw new Error('Chain not found');
+		}
+
+		let chain_rpc = chain.apis?.rpc;
+		let to_chain_rpc = to_chain.apis?.rpc;
+		if (chain_rpc === undefined || to_chain_rpc === undefined) {
+			throw new Error('Chain RPC not found');
+		}
+
+		let wallet = await get_wallet_for_chain(chain.chain_id);
+		const addr = (await wallet.getAccounts())[0].address;
+
+		const to_wallet = await get_wallet_for_chain(to_chain.chain_id);
+		const to_wallet_addr = (await to_wallet.getAccounts())[0].address;
+
+		// get current time in seconds
+		const current_time = Math.floor(Date.now() / 1000);
+		const timeout_time = current_time + 300; // 5 minutes
+				
+		if (from_client === undefined) {
+			throw new Error('from_client not found');
+		}
+
+		// ensurer ibc_denom ibc_amount is not > balances
+		for (const balance of balances) {
+			if (balance.denom === ibc_denom) {
+				if (Number(balance.amount) < ibc_amount) {
+					toast.error(`You do not have ${ibc_amount} ${ibc_denom}`, toast_style);
+					throw new Error('Not enough balance');
+				}
+			}
+		}
+
+		toast('Waiting for Keplr to sign IBC transfer', { ...toast_style, icon: '⏳' });
+
+		from_client
+			.sendIbcTokens(
+				addr,
+				to_wallet_addr,
+				{ denom: ibc_denom, amount: ibc_amount.toString() },
+				port_id,
+				origin_channel_id,
+				undefined,
+				timeout_time,
+				{ amount: [], gas: gas.toString() },
+				`IBC-Anywhere by Reece | from ${chain.pretty_name} to ${to_chain.pretty_name}`
+			)
+			.then((tx) => {
+				console.log(tx);
+				if (tx.code == 0) {
+					toast.success(
+						`Middlware IBC transfer from ${chain.pretty_name} successful\n\nTxHash: ${tx.transactionHash}`,
+						toast_style
+					);					
+				}				
+			})			
+			.catch((err) => {
+				toast.error(`${err}`, toast_style);
+			});      
+		
+		if(call_number == 1) {
+
+			// now we call again to send to the actual chain they wanted, where to get this to_chain data from?
+			// pretty sure this logic is way wrong, but yea
+			const channel_id = get_channel(final_hop_chain, to_chain.chain_name); // ex: channel-141
+			if (channel_id === undefined || channel_id === '') {
+				toast.error(
+					`idk it erroed`,
+				);
+				throw new Error('Channel not found');
+			}		
+
+
+
+			ibc_transfer_channel_hop(final_hop_chain, channel_id, call_number+1);
+
+		}
+
+
+	};
+
 	const get_ibc_denom_human_readable = async (chain_id: string, ibc_trace: string): Promise<DenomTrace | undefined> => {		
 
 		if (ibc_trace !== undefined && (!ibc_trace.startsWith('ibc/'))) {
@@ -293,10 +429,26 @@
 		const queryClient = QueryClient.withExtensions(tm_client);
 		let ext = setupIbcExtension(queryClient);
 
-		// maybe get all denom traces in the future instead of a single one per
-		const data = await ext.ibc.transfer.denomTrace(ibc_trace);
+		// maybe get all denom traces in the future instead of a single one per, are they the same SHA hash (trace)?
+		const data = await ext.ibc.transfer.denomTrace(ibc_trace)
+		// .catch((err) => {
+		// 	console.log(err);
+		// 	toast.error(`Error getting denom trace for ${ibc_trace} on chain ${chain_input}`, toast_style);
+		// 	return undefined;
+		// })
+
+		console.log(data);
 
 		return data?.denomTrace;
+	}
+
+	// this would be in place of connect wallet
+
+	interface Balance {
+		denom: string; // human readable (ex: uosmo)
+		amount: string;
+		ibc_trace?: string; // ibc/
+		channel?: string;
 	}
 
 
@@ -306,8 +458,15 @@
 
 <!-- datalist of users_balances -->
 <datalist id="denoms">
-	{#each users_balances as balance}
+	{#each balances as balance}
 		<option value={balance.denom}>{balance.denom}</option>
+	{/each}
+</datalist>
+
+<!-- datalist of denoms in humand reacable format -->
+<datalist id="denoms_human_readable">
+	{#each balances as denom}
+		<option value={denom.denom}>{denom.denom}</option>
 	{/each}
 </datalist>
 
@@ -346,21 +505,22 @@
 		<!-- li of users_balances -->
 		<h3>balances</h3>
 		<ul>
-			{#each users_balances as balance}
-				<!-- if denom starts with ibc/, we need to decode the ibc-trace -->
+			{#each balances as b}
+				<!-- if denom starts with ibc/, we need to decode the ibc-trace -->				
 
 				<!-- await a query to get_ibc_denom_human_readable -->
-				{#await get_ibc_denom_human_readable(chain_input, balance.denom)}
+				{#await get_ibc_denom_human_readable(chain_input, b.denom)}
 					<p>loading denoms....</p>
 				{:then denom_data}
 					{#if denom_data !== undefined}
 						<!-- We need to save this somewhere so we can channel hop over to .path then to the new designation chain. But ensure we don't hop if there is no connect to said chain -->
-						<li>{balance.amount} {denom_data.baseDenom} ({denom_data.path})</li>
-					{:else}
-						<li>{balance.amount} {balance.denom}</li>
-					{/if}
-				{:catch error}
-					<p style="color: red">{error.message}</p>
+						<li>{b.amount} {denom_data.baseDenom} ({denom_data.path})</li>
+						{:else}
+						<li>{b.amount} {b.denom}</li>
+						{/if}
+					{:catch error}
+						<!-- <p style="color: red">{error.message}</p> -->
+						<li>{b.amount} {b.denom}</li>
 				{/await}
 			{/each}
 		</ul>
@@ -369,29 +529,29 @@
 
 		<select bind:value={ibc_denom}>
 			<option value="" disabled selected>Select a Denom</option>
-			{#each users_balances as balance, i}
-
-			{#await get_ibc_denom_human_readable(chain_input, balance.denom)}
-				<p>loading denoms....</p>
-			{:then denom_data}
-				{#if denom_data !== undefined}
-					<li>{balance.amount} </li>
-					<option value={balance.denom}>{denom_data.baseDenom} ({denom_data.path})</option>
-				{:else}					
-					<option value={balance.denom}>{balance.denom}</option>
-				{/if}							
-			{:catch error}
-				<option value={balance.denom}>{balance.denom}</option>
-			{/await}
 			
+			{#each balances as balance, i}				
+				{#if balance.channel === undefined}
+					<option value={balance.denom}>{balance.denom}</option>				
+				{:else}
+					<option value={balance.ibc_trace}>{balance.denom} ({balance.channel})</option>
+				{/if}				
 			{/each}
+
 		</select>
 
 		<!-- select iterate over  -->
-
 		<h4>To Chain</h4>
 		<input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input} />
-		<input type="submit" on:click={() => ibc_transfer()} />
+
+		<!-- Sends the token directly to the other chain reguardless of its metadata (ex: if its from osmosis) -->
+		<input type="submit" value="Direct Send" on:click={() => ibc_transfer()} />
+
+		<!-- if ibc_denom is set, then show a button here which says "Proper Send" -->
+		{#if ibc_denom !== undefined}
+			<input type="submit" value="Proper Send" on:click={() => console.log(`Routing to XYZ`)} />
+		{/if}
+
 	</div>
 
 	<div id="successful_txs" style="display: none;" class="div_center">
