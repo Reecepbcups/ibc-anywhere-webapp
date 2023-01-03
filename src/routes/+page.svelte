@@ -14,8 +14,10 @@
 <script lang="ts">
 	import type { Window as KeplrWindow } from '@keplr-wallet/types';
 
+	import { Tendermint34Client } from '@cosmjs/tendermint-rpc';
 	import type { Coin } from 'cosmjs-types/cosmos/base/v1beta1/coin';
-	import { SigningStargateClient } from '@cosmjs/stargate';
+	import { SigningStargateClient, setupIbcExtension, QueryClient } from '@cosmjs/stargate';
+	import type { DenomTrace } from '@cosmjs/stargate/node_modules/cosmjs-types/ibc/applications/transfer/v1/transfer';
 
 	import type { OfflineAminoSigner } from '@cosmjs/amino';
 	import type { OfflineDirectSigner } from '@cosmjs/proto-signing';
@@ -37,6 +39,8 @@
 		duration: 6000,
 		style: 'background: #333; color: #fff; width: 15%; font-size: 1.1rem;'
 	};    
+
+	let final_denom_storage: any = {}; // "ustars": { ibc, channel } (or '')
 
 	let chain_input: string;
 	let to_chain_input: string;
@@ -114,9 +118,12 @@
 		const balances = await from_client.getAllBalances((await wallet.getAccounts())[0].address);
 		// console.log(balances)
 
+		// TODO: convert IBC denoms over to their human readable versions here? Just make a new Coin		
+		
 		// set the global users_balances to balances
 		let new_balances: Coin[] = [];
-		for (const balance of balances) {
+		for (const balance of balances) {			let converted_balance = 
+			// let new_coin = Coin.fromJSON({denom: "test", amount: "1000000000000000000"})
 			new_balances.push(balance);
 		}
 		users_balances = new_balances;
@@ -262,6 +269,37 @@
 				toast.error(`${err}`, toast_style);
 			});        
 	};
+
+	const get_ibc_denom_human_readable = async (chain_id: string, ibc_trace: string): Promise<DenomTrace | undefined> => {		
+
+		if (ibc_trace !== undefined && (!ibc_trace.startsWith('ibc/'))) {
+			return undefined;
+		}
+
+		// TODO: save this client in an object and/or iterate over failed client created in the chain_rpc array
+		// create a stargate query client, query the ibc-transfer denom-trace, and return the human readable name
+		const chain = chains.find((chain) => chain.chain_id === chain_id);
+		if (chain === undefined) {
+			toast.error(`Chain ${chain_id} not found`, toast_style);
+			throw new Error('Chain not found');
+		}
+
+		let chain_rpc = chain.apis?.rpc;
+		if (chain_rpc === undefined) {
+			throw new Error('Chain RPC not found');
+		}
+
+		const tm_client = await Tendermint34Client.connect(chain_rpc[0].address);		
+		const queryClient = QueryClient.withExtensions(tm_client);
+		let ext = setupIbcExtension(queryClient);
+
+		// maybe get all denom traces in the future instead of a single one per
+		const data = await ext.ibc.transfer.denomTrace(ibc_trace);
+
+		return data?.denomTrace;
+	}
+
+
 </script>
 
 <Toaster />
@@ -310,20 +348,46 @@
 		<ul>
 			{#each users_balances as balance}
 				<!-- if denom starts with ibc/, we need to decode the ibc-trace -->
-				<!-- {#if } -->
-				<li>{balance.amount} {balance.denom}</li>
+
+				<!-- await a query to get_ibc_denom_human_readable -->
+				{#await get_ibc_denom_human_readable(chain_input, balance.denom)}
+					<p>loading denoms....</p>
+				{:then denom_data}
+					{#if denom_data !== undefined}
+						<!-- We need to save this somewhere so we can channel hop over to .path then to the new designation chain. But ensure we don't hop if there is no connect to said chain -->
+						<li>{balance.amount} {denom_data.baseDenom} ({denom_data.path})</li>
+					{:else}
+						<li>{balance.amount} {balance.denom}</li>
+					{/if}
+				{:catch error}
+					<p style="color: red">{error.message}</p>
+				{/await}
 			{/each}
 		</ul>
 
-		<input type="number" placeholder="Amount" bind:value={ibc_amount} />
+		<input type="number" placeholder="Amount" bind:value={ibc_amount} />		
 
-		<!-- create a select input box of list denoms -->
 		<select bind:value={ibc_denom}>
 			<option value="" disabled selected>Select a Denom</option>
 			{#each users_balances as balance, i}
+
+			{#await get_ibc_denom_human_readable(chain_input, balance.denom)}
+				<p>loading denoms....</p>
+			{:then denom_data}
+				{#if denom_data !== undefined}
+					<li>{balance.amount} </li>
+					<option value={balance.denom}>{denom_data.baseDenom} ({denom_data.path})</option>
+				{:else}					
+					<option value={balance.denom}>{balance.denom}</option>
+				{/if}							
+			{:catch error}
 				<option value={balance.denom}>{balance.denom}</option>
+			{/await}
+			
 			{/each}
 		</select>
+
+		<!-- select iterate over  -->
 
 		<h4>To Chain</h4>
 		<input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input} />
