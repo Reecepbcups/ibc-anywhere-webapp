@@ -17,20 +17,25 @@
 	import type { Coin } from 'cosmjs-types/cosmos/base/v1beta1/coin';
 	import { SigningStargateClient } from '@cosmjs/stargate';
 
+	// Signing (Keplr & Ledger)
 	import type { OfflineAminoSigner } from '@cosmjs/amino';
 	import type { OfflineDirectSigner } from '@cosmjs/proto-signing';
 
-	// use cosmos kit for wallets instead of base keplr
-	// https://github.com/cosmology-tech/cosmos-kit/blob/main/packages/example/pages/_app.tsx
-	// import { wallets as keplrWallet } from "@cosmos-kit/keplr";	
+	// ibc balances
+	import { Tendermint34Client } from '@cosmjs/tendermint-rpc';
+	import { setupIbcExtension, QueryClient } from '@cosmjs/stargate';
+	import type { DenomTrace } from '@cosmjs/stargate/node_modules/cosmjs-types/ibc/applications/transfer/v1/transfer';
+	import type {IbcExtension} from '@cosmjs/stargate/build/modules/ibc/queries';
 
-	import toast, { Toaster } from 'svelte-french-toast';    
-
-	import type { ToastOptions } from 'svelte-french-toast';
+	// notifications
+	import toast, { Toaster, type ToastOptions } from 'svelte-french-toast';    	
 
 	// https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts
 	// import type { IBCInfo } from '@chain-registry/types';
 	import { assets, chains, ibc } from 'chain-registry';
+
+	// Since RPCs are Ass, force use mine which ACTUALLY HAS CORS ENABLED AND LETS ME DEVELOP
+	const JUNO_RPC = "https://juno-rpc.reece.sh"
 
 	const toast_style: ToastOptions = {
 		position: 'top-right',
@@ -38,9 +43,18 @@
 		style: 'background: #333; color: #fff; width: 15%; font-size: 1.1rem;'
 	};    
 
+	interface Balance {
+		denom: string; // human readable (ex: uosmo)
+		amount: string;
+		ibc_trace?: string; // ibc/
+		channel?: string;
+		// chain_id?: string; // this possible to get from channel-number?
+	}
+
 	let chain_input: string;
 	let to_chain_input: string;
-	let users_balances: Coin[] = [];
+	
+	let balances: Balance[] = [];
 
 	const channel_version: string = 'ics20-1';
 	const port_id: string = 'transfer';
@@ -50,6 +64,39 @@
 	let ibc_amount: number;
 
 	let from_client: SigningStargateClient | undefined;
+
+	let query_client: IbcExtension;
+	const get_query_client = async (chain_id: string): Promise<IbcExtension> => {		
+		const chain = chains.find((chain) => chain.chain_id === chain_id);
+		if (chain === undefined) {
+			toast.error(`Chain ${chain_id} not found`, toast_style);
+			throw new Error('Chain not found');
+		}
+		let chain_rpc = chain.apis?.rpc;
+		if (chain_rpc === undefined) {
+			throw new Error('Chain RPC not found');
+		}
+
+		// hardcode non ass endpoints that actually work
+		if(chain_id === "juno-1") {
+			chain_rpc = [{address: JUNO_RPC}, {address: "https://rpc.juno.strange.love/"}, ...chain_rpc]
+		}		
+
+		// try 10 different endpoints max
+		for (let i = 0; i < 10; i++) {
+			try {
+				const tm_client = await Tendermint34Client.connect(chain_rpc[i].address);		
+				let temp = QueryClient.withExtensions(tm_client);
+				query_client = setupIbcExtension(temp);
+				break;
+			} catch (error) {
+				// cors issues
+				console.log(error);
+			}
+		}
+
+		return query_client;
+	}
 
 	const get_wallet_for_chain = async (
 		chain_id: string
@@ -74,6 +121,21 @@
 		return signer(chain_id);
 	};
 
+	const get_ibc_denom_human_readable = async (chain_id: string, ibc_trace: string): Promise<DenomTrace | undefined> => {		
+		if (ibc_trace !== undefined && (!ibc_trace.startsWith('ibc/'))) {
+			return undefined;
+		}
+
+		// redefine as it could be a new wallet / chain connection
+		query_client = await get_query_client(chain_id);		
+		
+		// maybe get all denom traces in the future instead of a single one per, are they the same SHA hash (trace)?
+		const data = await query_client.ibc.transfer.denomTrace(ibc_trace);
+		console.log('data', data)
+
+		return data?.denomTrace;
+	}
+
 	// async function connectToChain
 	const connect_wallet_get_balances = async () => {		
 		const chain = chains.find((chain) => chain.chain_id === chain_input);
@@ -81,7 +143,7 @@
 			throw new Error('Chain not found');
 		}
 
-		const chain_rpc = chain.apis?.rpc;
+		let chain_rpc = chain.apis?.rpc;
 		if (chain_rpc === undefined) {
 			throw new Error('Chain RPC not found');
 		}
@@ -90,6 +152,11 @@
 		wallet.getAccounts().then((accounts) => {
 			console.log('accounts', accounts);
 		});
+
+		// hardcode non ass endpoints that actually work
+		if(chain.chain_id === "juno-1") {
+			chain_rpc = [{address: JUNO_RPC}, {address: "https://rpc.juno.strange.love/"}, ...chain_rpc]
+		}	
 
 		// try 10 different endpoints max
 		for (let i = 0; i < 10; i++) {
@@ -111,20 +178,46 @@
 
 		// get the from balance of addr
 		// assign read only from await client.getAllBalances(addr) to user_balancecs Coin[]
-		const balances = await from_client.getAllBalances((await wallet.getAccounts())[0].address);
-		// console.log(balances)
-
-		// set the global users_balances to balances
-		let new_balances: Coin[] = [];
-		for (const balance of balances) {
-			new_balances.push(balance);
-		}
-		users_balances = new_balances;
-		console.log(users_balances);
-
+		const _bals = await from_client.getAllBalances((await wallet.getAccounts())[0].address);
+		// console.log(balances)		
+		
+		// set the global users_balances to balances		
+		balances = []
+		for (const b of _bals) {
+			// instead get all denoms from the chain in the future so it only requires 1 query
+			if (b.denom.startsWith('ibc/')) {				
+				// get the human readable name
+				await get_ibc_denom_human_readable(chain_input, b.denom).then((denom_trace) => {
+					if (denom_trace !== undefined) {
+						balances.push({
+							denom: denom_trace.baseDenom,
+							amount: b.amount,
+							ibc_trace: b.denom, // so we know what we are actually sending
+							channel: denom_trace.path,
+						});
+					}
+				}).catch((error) => {
+					// its possible you send a denom to another chain which does not have it
+					// Ex: Osmosis DEX stars -> Cosmos Hub - breaks since CosmosHub is not relaying with stars
+					// So push it as ibc_trace for the Denom name, oh well
+					console.log(error);
+					balances.push({
+						denom: b.denom,
+						amount: b.amount,						
+					});
+				})
+			} else {
+				balances.push({
+					denom: b.denom,
+					amount: b.amount,
+				});
+			}
+		}		
+		// update it for Svelte
+		balances = [...balances]
+		console.log('balances', balances);
 		// set the id of denoms_to_send to display show
 		document.getElementById('denoms_to_send')!.style.display = 'block';
-
 		toast.success(`Keplr Connected to ${chain.pretty_name}`, {
 			position: 'top-right',
 			duration: 6000,
@@ -166,30 +259,26 @@
 
 	// get_all_channel_pairs("cosmoshub")
 
-	const get_channel = (from_name: string, to_name: string): string => {
+	const get_channel = (from_name: string, to_name: string): string | undefined => {
 		const pairs = get_all_channel_pairs(from_name);
-
 		// todo; add version & port_id in the future
-
 		for (const pair of pairs) {
 			if (pair.name === to_name) {
 				return pair.channel_id;
 			}
 		}
 
-		return '';
+		return undefined;
 	};
 
 	const ibc_transfer = async () => {
 		// use sendIbcTokens from stargate client
-		// const chain_id = "cosmoshub-4"
 		const chain = chains.find((chain) => chain.chain_id === chain_input);
 		if (chain === undefined) {
 			toast.error(`From chain ${chain_input} not found`, toast_style);
 			throw new Error('Chain not found');
 		}
 
-		// const to_chain_id = "osmosis-1"
 		const to_chain = chains.find((chain) => chain.chain_id === to_chain_input);
 		if (to_chain === undefined) {
 			toast.error(`To chain ${to_chain_input} not found`, toast_style);
@@ -223,17 +312,7 @@
 
 		if (from_client === undefined) {
 			throw new Error('from_client not found');
-		}
-
-		// ensurer ibc_denom ibc_amount is not > balances
-		for (const balance of users_balances) {
-			if (balance.denom === ibc_denom) {
-				if (Number(balance.amount) < ibc_amount) {
-					toast.error(`You do not have ${ibc_amount} ${ibc_denom}`, toast_style);
-					throw new Error('Not enough balance');
-				}
-			}
-		}
+		}		
 
 		toast('Waiting for Keplr to sign IBC transfer', { ...toast_style, icon: '⏳' });
 
@@ -268,7 +347,7 @@
 
 <!-- datalist of users_balances -->
 <datalist id="denoms">
-	{#each users_balances as balance}
+	{#each balances as balance}
 		<option value={balance.denom}>{balance.denom}</option>
 	{/each}
 </datalist>
@@ -280,10 +359,24 @@
 	{/each}
 </datalist>
 
+<!-- datalist of denoms in humand reacable format -->
+<datalist id="denoms_human_readable">
+	{#each balances as denom}
+		<option value={denom.denom}>{denom.denom}</option>
+	{/each}
+</datalist>
+
+<!-- chain names & match with chain_id value -->
+<datalist id="chain_names">
+	{#each chains as chain}
+		<option value={chain.chain_id}>{chain.pretty_name}</option>
+	{/each}
+</datalist>
+
 <!-- main website code -->
-<h1>IBC Anywhere</h1>
+<h1>IBC Aggregator</h1>
 <p>Easily IBC token transfer from and to any chain in 5 clicks (Desktop only right now) (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
-<p><b>Includes Ledger Support (as of Jan 1st)</b></p>
+<p><i>WIP: channel proxy passthrough & ETH bridge support</i></p>
 <p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
 
 <center>
@@ -298,20 +391,22 @@
 			bind:value={chain_input}
 		/>
 		<br />
-
 		<br />
+
 		<!-- Connects the wallet to the current chain, then we will show the user more information. -->
 		<input type="submit" value="Connect Wallet" on:click={() => connect_wallet_get_balances()} />
 	</div>
 
-	<div id="denoms_to_send" style="display: none;" class="div_center">
-		<!-- li of users_balances -->
+	<div id="denoms_to_send" style="display: none;" class="div_center">		
 		<h3>balances</h3>
+
 		<ul>
-			{#each users_balances as balance}
-				<!-- if denom starts with ibc/, we need to decode the ibc-trace -->
-				<!-- {#if } -->
-				<li>{balance.amount} {balance.denom}</li>
+			{#each balances as b}
+				{#if b.channel === undefined}
+					<li>{b.amount} {b.denom}</li>
+				{:else}
+					<li>{b.amount} {b.denom} <i>({b.channel})</i></li>
+				{/if}
 			{/each}
 		</ul>
 
@@ -320,9 +415,15 @@
 		<!-- create a select input box of list denoms -->
 		<select bind:value={ibc_denom}>
 			<option value="" disabled selected>Select a Denom</option>
-			{#each users_balances as balance, i}
-				<option value={balance.denom}>{balance.denom}</option>
+
+			{#each balances as balance, i}	
+				{#if balance.channel === undefined}
+					<option value={balance.denom}>{balance.denom}</option>				
+				{:else}
+					<option value={balance.ibc_trace}>{balance.denom} ({balance.channel})</option>
+				{/if}
 			{/each}
+
 		</select>
 
 		<h4>To Chain</h4>
