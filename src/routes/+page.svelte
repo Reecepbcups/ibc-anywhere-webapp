@@ -66,11 +66,7 @@
 	let from_client: SigningStargateClient | undefined;
 
 	let query_client: IbcExtension;
-	const get_query_client = async (chain_id: string): Promise<IbcExtension> => {
-		// TODO: iterate through multiple until we get one with CORS
-
-		// TODO: save this client in an object and/or iterate over failed client created in the chain_rpc array
-		// create a stargate query client, query the ibc-transfer denom-trace, and return the human readable name
+	const get_query_client = async (chain_id: string): Promise<IbcExtension> => {		
 		const chain = chains.find((chain) => chain.chain_id === chain_id);
 		if (chain === undefined) {
 			toast.error(`Chain ${chain_id} not found`, toast_style);
@@ -151,21 +147,9 @@
 		
 		// maybe get all denom traces in the future instead of a single one per, are they the same SHA hash (trace)?
 		const data = await query_client.ibc.transfer.denomTrace(ibc_trace);
-
 		console.log('data', data)
 
-		// doesn't return
-		// const data = await query_client.ibc.transfer.allDenomTraces();
-		// for(const trace of data.denomTraces) {			
-		// 	// console.log(trace); // {path: 'transfer/channel-132', baseDenom: 'ugraviton'}
-		// 	if (trace.path === ibc_trace) {
-		// 		return trace;
-		// 	}
-		// }		
-
-		// console.log(data);
 		return data?.denomTrace;
-		// return undefined;
 	}
 
 	// async function connectToChain
@@ -293,9 +277,7 @@
 
 	const get_channel = (from_name: string, to_name: string): string | undefined => {
 		const pairs = get_all_channel_pairs(from_name);
-
 		// todo; add version & port_id in the future
-
 		for (const pair of pairs) {
 			if (pair.name === to_name) {
 				return pair.channel_id;
@@ -307,14 +289,12 @@
 
 	const ibc_transfer = async () => {
 		// use sendIbcTokens from stargate client
-		// const chain_id = "cosmoshub-4"
 		const chain = chains.find((chain) => chain.chain_id === chain_input);
 		if (chain === undefined) {
 			toast.error(`From chain ${chain_input} not found`, toast_style);
 			throw new Error('Chain not found');
 		}
 
-		// const to_chain_id = "osmosis-1"
 		const to_chain = chains.find((chain) => chain.chain_id === to_chain_input);
 		if (to_chain === undefined) {
 			toast.error(`To chain ${to_chain_input} not found`, toast_style);
