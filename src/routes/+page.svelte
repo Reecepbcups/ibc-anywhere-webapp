@@ -121,22 +121,6 @@
 		return signer(chain_id);
 	};
 
-	const get_connection_hops = async (from_chain: string, transferChannel: string): Promise<string[] | undefined> => {
-		if (transferChannel === undefined) {
-			return undefined;
-		}
-
-		if (!transferChannel.startsWith('transfer/')) {
-			return undefined;
-		}
-
-		// use query_client
-		const data = await query_client.ibc.verified.channel.channel(port_id, transferChannel);
-		console.log('data', data);
-
-		return data?.connectionHops
-	}
-
 	const get_ibc_denom_human_readable = async (chain_id: string, ibc_trace: string): Promise<DenomTrace | undefined> => {		
 		if (ibc_trace !== undefined && (!ibc_trace.startsWith('ibc/'))) {
 			return undefined;
