@@ -37,6 +37,11 @@
 		"@cosmos-kit/keplr": "^0.32.14",
 		"chain-registry": "^1.6.0",
 		"cosmjs-types": "^0.6.1",
-		"svelte-french-toast": "^1.0.3"
+		"svelte-french-toast": "^1.0.3",
+		"@terra-money/terra.js": "^3.1.6",
+		"@terra-money/wallet-provider": "^3.6.5",
+		"buffer": "^6.0.3",
+		"rxjs": "^7.4.0",
+		"vite-compatible-readable-stream": "^3.6.0"
 	}
 }
