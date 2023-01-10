@@ -11,7 +11,21 @@
     - Auto convert IBC denoms to their human readable versions, including exponents
     - Mobile Support
 -->
+
+
 <script lang="ts">
+
+	// Terra Station Wallet
+	import { initController } from '../controller';
+  	import ConnectSample from '../components/ConnectSample.svelte';
+  	import QuerySample from '../components/QuerySample.svelte';
+  	// import TxSample from '../components/TxSample.svelte';
+	
+	let initialized = false; // terra.js
+	initController().then(() => {
+		initialized = true;
+	});	
+
 	import type { Window as KeplrWindow } from '@keplr-wallet/types';
 
 	import type { Coin } from 'cosmjs-types/cosmos/base/v1beta1/coin';
@@ -344,6 +358,17 @@
 </script>
 
 <Toaster />
+
+
+{#if !initialized}
+	<div>Initializing Terra Wallet...</div>
+{:else}	
+
+	<!--  make a button to do this -->
+	<ConnectSample />
+	<!-- <QuerySample /> -->
+	<!-- <TxSample /> -->
+{/if}
 
 <!-- datalist of users_balances -->
 <datalist id="denoms">
