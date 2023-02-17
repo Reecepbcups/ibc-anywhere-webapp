@@ -390,7 +390,7 @@
 </datalist>
 
 <!-- main website code -->
-<h1>IBC Aggregator</h1>
+<h1>IBC Anywhere</h1>
 <p>Easily IBC token transfer from and to any chain in 5 clicks (Desktop only right now) (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
 <p><i>WIP: channel proxy passthrough & ETH bridge support</i></p>
 <p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
