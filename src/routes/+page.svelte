@@ -371,6 +371,11 @@
 			actual_amount = ibc_amount * 10**6;
 		}
 
+		if (ibc_denom.length == 0) {
+			toast.error(`No denom selected`, toast_style);
+			throw new Error('No denom selected');
+		}
+
 		from_client
 			.sendIbcTokens(
 				addr,
