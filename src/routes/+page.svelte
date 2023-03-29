@@ -30,9 +30,14 @@
 	// notifications
 	import toast, { Toaster, type ToastOptions } from 'svelte-french-toast';    	
 
-	// https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts
-	// import type { Chain, IBCInfo } from '@chain-registry/types';
+	// https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts	
+	// Can't find module even though its the same for the fork?
 	import { assets, chains, ibc } from 'chain-registry';
+
+	// This does not work for Failed to load url?
+	// import assets from '../../node_modules/chain-registry/packages/chain-registry/types/assets';	
+	// import chains from '../../node_modules/chain-registry/packages/chain-registry/types/chains';
+	// import ibc from '../../node_modules/chain-registry/packages/chain-registry/types/ibc';
 
 	// Since RPCs are Ass, force use mine which ACTUALLY HAS CORS ENABLED AND LETS ME DEVELOP
 	const JUNO_RPC = "https://juno-rpc.reece.sh"
