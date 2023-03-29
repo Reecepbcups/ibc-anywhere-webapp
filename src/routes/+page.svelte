@@ -30,12 +30,18 @@
 	// notifications
 	import toast, { Toaster, type ToastOptions } from 'svelte-french-toast';    	
 
-	// https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts
-	// import type { IBCInfo } from '@chain-registry/types';
-	import { assets, chains, ibc } from 'chain-registry';
+	// https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts	
+	// Can't find module even though its the same for the fork?
+	import { assets, chains, ibc } from '../chain-registry';
+
+	// This does not work for Failed to load url?
+	// import assets from '../../node_modules/chain-registry/packages/chain-registry/types/assets';	
+	// import chains from '../../node_modules/chain-registry/packages/chain-registry/types/chains';
+	// import ibc from '../../node_modules/chain-registry/packages/chain-registry/types/ibc';
 
 	// Since RPCs are Ass, force use mine which ACTUALLY HAS CORS ENABLED AND LETS ME DEVELOP
 	const JUNO_RPC = "https://juno-rpc.reece.sh"
+	const CANTO_RPC = "https://canto-rpc.reece.sh"
 
 	let divisor = 10**6;
 	let toggle_divisor = () => {
@@ -75,6 +81,18 @@
 	let ibc_amount: number;
 
 	let from_client: SigningStargateClient | undefined;
+	
+	const proper_rpcs = (chain_id: string, chain_rpc: any) => {		
+		let rpcs: any;
+		if(chain_id === "juno-1") {
+			rpcs = [{address: JUNO_RPC}, {address: "https://rpc.juno.strange.love/"}, ...chain_rpc]
+		} else if (chain_id === "canto_7700-1") {
+			rpcs = [{address: CANTO_RPC}, ...chain_rpc]
+		} else {
+			rpcs = chain_rpc
+		}
+		return rpcs
+	}
 
 	let query_client: IbcExtension;
 	const get_query_client = async (chain_id: string): Promise<IbcExtension> => {		
@@ -86,12 +104,14 @@
 		let chain_rpc = chain.apis?.rpc;
 		if (chain_rpc === undefined) {
 			throw new Error('Chain RPC not found');
-		}
-
-		// hardcode non ass endpoints that actually work
-		if(chain_id === "juno-1") {
-			chain_rpc = [{address: JUNO_RPC}, {address: "https://rpc.juno.strange.love/"}, ...chain_rpc]
 		}		
+
+		// hardcode non ass endpoints that actually work	
+		chain_rpc = proper_rpcs(chain_id, chain_rpc)
+		if (!chain_rpc) {
+			throw new Error('Chain RPC not found');
+		}		
+
 
 		// try 10 different endpoints max
 		for (let i = 0; i < 10; i++) {
@@ -165,8 +185,9 @@
 		});
 
 		// hardcode non ass endpoints that actually work
-		if(chain.chain_id === "juno-1") {
-			chain_rpc = [{address: JUNO_RPC}, {address: "https://rpc.juno.strange.love/"}, ...chain_rpc]
+		chain_rpc = proper_rpcs(chain.chain_id, chain_rpc)
+		if (!chain_rpc) {
+			throw new Error('Chain RPC not found');
 		}	
 
 		// try 10 different endpoints max
@@ -394,9 +415,8 @@
 </datalist>
 
 <!-- main website code -->
-<h1>IBC Aggregator</h1>
-<p>Easily IBC token transfer from and to any chain in 5 clicks (Desktop only right now) (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
-<p><i>WIP: channel proxy passthrough & ETH bridge support</i></p>
+<h1>IBC Anywhere</h1>
+<p>Easily IBC token transfer from and to any chain in a new clicks (Desktop only right now) (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
 <p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
 
 <center>
