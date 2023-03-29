@@ -35,7 +35,7 @@
 	"dependencies": {
 		"@cosmjs/stargate": "^0.29.5",
 		"@cosmos-kit/keplr": "^0.32.14",
-		"chain-registry": "github:reecepbcups/chain-registry-ts#b389e8d0a0200e67388bc5713fe89753a0d60c8c",
+		"chain-registry": "^1.6.0",
 		"cosmjs-types": "^0.6.1",
 		"svelte-french-toast": "^1.0.3"
 	}
