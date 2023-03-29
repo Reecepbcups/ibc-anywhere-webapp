@@ -30,9 +30,14 @@
 	// notifications
 	import toast, { Toaster, type ToastOptions } from 'svelte-french-toast';    	
 
-	// https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts
-	// import type { Chain, IBCInfo } from '@chain-registry/types';
-	import { assets, chains, ibc } from 'chain-registry';
+	// https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts	
+	// Can't find module even though its the same for the fork?
+	import { assets, chains, ibc } from '../chain-registry';
+
+	// This does not work for Failed to load url?
+	// import assets from '../../node_modules/chain-registry/packages/chain-registry/types/assets';	
+	// import chains from '../../node_modules/chain-registry/packages/chain-registry/types/chains';
+	// import ibc from '../../node_modules/chain-registry/packages/chain-registry/types/ibc';
 
 	// Since RPCs are Ass, force use mine which ACTUALLY HAS CORS ENABLED AND LETS ME DEVELOP
 	const JUNO_RPC = "https://juno-rpc.reece.sh"
@@ -391,8 +396,7 @@
 
 <!-- main website code -->
 <h1>IBC Anywhere</h1>
-<p>Easily IBC token transfer from and to any chain in 5 clicks (Desktop only right now) (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
-<p><i>WIP: channel proxy passthrough & ETH bridge support</i></p>
+<p>Easily IBC token transfer from and to any chain in a new clicks (Desktop only right now) (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
 <p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
 
 <center>
