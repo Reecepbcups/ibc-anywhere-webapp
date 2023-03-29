@@ -217,7 +217,7 @@
 		balances = []
 		for (const b of _bals) {
 			// instead get all denoms from the chain in the future so it only requires 1 query
-			if (b.denom.startsWith('ibc/')) {				
+			if (b.denom.startsWith('ibc/')) {		
 				// get the human readable name
 				await get_ibc_denom_human_readable(chain_input, b.denom).then((denom_trace) => {
 					if (denom_trace !== undefined) {
@@ -226,6 +226,8 @@
 						if(symbol.startsWith('u')) {
 							symbol = symbol.substring(1).toUpperCase();
 						}
+
+						console.log('symbol', symbol)
 
 						balances.push({
 							denom: denom_trace.baseDenom,
@@ -239,6 +241,7 @@
 					// its possible you send a denom to another chain which does not have it
 					// Ex: Osmosis DEX stars -> Cosmos Hub - breaks since CosmosHub is not relaying with stars
 					// So push it as ibc_trace for the Denom name, oh well
+				
 					console.log(error);
 					balances.push({
 						denom: b.denom,
@@ -247,10 +250,15 @@
 					});
 				})
 			} else {
+				let symbol = b.denom;
+				if(symbol.startsWith('u')) {
+					symbol = symbol.substring(1).toUpperCase();
+				}
+
 				balances.push({
 					denom: b.denom,
 					amount: b.amount,
-					symbol: b.denom, // standard ibc/ name if none is found
+					symbol: symbol, // standard ibc/ name if none is found
 				});
 			}
 		}		
@@ -357,17 +365,23 @@
 
 		toast('Waiting for Keplr to sign IBC transfer', { ...toast_style, icon: '⏳' });
 
+		// TODO: What about LP positions?
+		let actual_amount = ibc_amount;
+		if (divisor == 10**6) {
+			actual_amount = ibc_amount * 10**6;
+		}
+
 		from_client
 			.sendIbcTokens(
 				addr,
 				to_wallet_addr,
-				{ denom: ibc_denom, amount: ibc_amount.toString() },
+				{ denom: ibc_denom, amount: actual_amount.toString() },
 				port_id,
 				channel_id,
 				undefined,
 				timeout_time,
 				{ amount: [], gas: gas.toString() },
-				`IBC-Anywhere by Reece | from ${chain.pretty_name} to ${to_chain.pretty_name}`
+				`ibc.reece.sh | from ${chain.pretty_name} to ${to_chain.pretty_name}`
 			)
 			.then((tx) => {
 				console.log(tx);
@@ -470,9 +484,9 @@
 
 			{#each balances as balance, i}	
 				{#if balance.channel === undefined}
-					<option value={balance.denom}>{balance.denom}</option>				
+					<option value={balance.denom}>{balance.symbol}</option>				
 				{:else}
-					<option value={balance.ibc_trace}>{balance.denom} ({balance.channel})</option>
+					<option value={balance.ibc_trace}>{balance.symbol} ({balance.channel})</option>
 				{/if}
 			{/each}
 
@@ -480,7 +494,7 @@
 
 		<!-- create a button which when clicked, toggles divisor -->
 		<br>
-		<input type="submit" value="Toggle Divisor" on:click={() => toggle_divisor()} />
+		<input type="submit" value="(Advanced) Toggle Denom Format" on:click={() => toggle_divisor()} />
 
 		<h4>To Chain</h4>
 		<input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input} />
