@@ -433,10 +433,13 @@
 	{/each}
 </datalist>
 
-<!-- main website code -->
-<h1>IBC Anywhere</h1>
-<p>Easily IBC token transfer from and to any chain in a new clicks (Desktop only right now) (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
-<p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
+<div class="page container">
+
+	<h1>IBC Anywhere</h1>
+	<p>Easily IBC token transfer from and to any chain in a new clicks (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
+	<p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
+
+	<hr>
 
 <center>
 	<div id="from_chain" class="div_center">
@@ -449,8 +452,6 @@
 			list="chain_names"
 			bind:value={chain_input}
 		/>
-		<br />
-		<br />
 
 		<!-- Connects the wallet to the current chain, then we will show the user more information. -->
 		<input type="submit" value="Connect Wallet" on:click={() => connect_wallet_get_balances()} />
@@ -480,8 +481,8 @@
 				{/if}
 			{/each}
 		</ul>
-
-		<input type="number" placeholder="Amount" bind:value={ibc_amount} />		
+		
+		<input type="number" placeholder="Amount" bind:value={ibc_amount} />				
 
 		<!-- create a select input box of list denoms -->
 		<select bind:value={ibc_denom}>
@@ -510,30 +511,71 @@
 		<ul id="past_txs_ul" />
 	</div>
 </center>
+</div>
 
 <style>
-
 	* {
+		font-size: 1.0em;		
+		color: #fff;
 		font-family: 'Nunito Sans', sans-serif;
 	}
 
 	:global(body) {
-		background-color: #ffffff;
+		background-color: #1c1c1c;
 	}
 
-	h1,
-	h3,
-	p {
-		text-align: center;
-		color: black;
+	.page {
+		padding-top: 30px;
+		width: 100%;
+		margin: auto;
+		display: grid;
+		position: relative;
 	}
 
-	.div_center {
-		border: 1px solid black;
-		padding: 10px;
-		margin: 10px;
-		max-width: 50%;
-		float: none !important;
+	.container {
+		background-color: #333;
+		padding: 24px;
+		margin-top: 1%;
+		border-radius: 16px;
+		width: 600px;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		margin-left: auto;
+		margin-right: auto;
+		box-shadow: 15px 20px 30px #444444;
+		border: 1px solid #000;
+	}
+
+	input[type="submit"] {
+		margin: 16px;
+		padding: 8px 16px;
+		border: none;
+		border-radius: 8px;
+		background-color: #fff;
+		color: #000;
+		font-size: 16px;
+		cursor: pointer;
+	}
+
+	input[type='text'],
+	input[type='number'],
+	select {
+		width: 40%;
+		padding: 12px 20px;
+		margin: 8px 0;
+		display: inline-block;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		box-sizing: border-box;
+		color: #fff;		
+		background-color: #000;		
+	} 
+
+	h1 {
+		font-size: 48px;
+		margin-bottom: 10px;
 		text-align: center;
 	}
 
@@ -543,30 +585,5 @@
 
 	li {
 		margin: 10px;
-	}	
-
-	input[type='submit'] {
-		background-color: #5e72e4;
-		color: white;
-		padding: 16px 32px;
-		text-align: center;
-		text-decoration: none;
-		display: inline-block;
-		font-size: 16px;
-		margin: 4px 2px;
-		cursor: pointer;
-		border-radius: 8px;
-	}
-
-	input[type='text'],
-	input[type='number'],
-	select {
-		width: 25%;
-		padding: 12px 20px;
-		margin: 8px 0;
-		display: inline-block;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		box-sizing: border-box;
 	}
 </style>
