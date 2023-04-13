@@ -436,7 +436,7 @@
 <div class="page container">
 
 	<h1>IBC Anywhere</h1>
-	<p>Easily IBC token transfer from and to any chain in a new clicks (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
+	<p>Easily IBC token transfer from and to any chain in a few clicks (<a href="https://twitter.com/Reecepbcups_" target="noreferrer">Get Support</a>)</p>
 	<p><a href="https://github.com/Reecepbcups/ibc-anywhere-webapp" target="noreferrer">Open Source</a></p>
 
 	<hr>
