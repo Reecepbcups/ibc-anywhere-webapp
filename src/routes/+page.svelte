@@ -438,8 +438,8 @@
 			? Long.fromNumber(timeoutTimestamp).multiply(1_000_000_000)
 			: undefined;
 
-			let pfm_memo: string = `{"forward":{"receiver":${pfmWalletAddr},"port":"transfer","channel":${to_final_channel}}}`
-			alert(pfm_memo)
+			let pfm_memo: string = `{ "forward": {"receiver": "${pfmWalletAddr}","port":"transfer","channel":"${to_final_channel}"}}`
+			console.log(pfm_memo)
 
 			const transferMsg: MsgTransferEncodeObject = {
 				typeUrl: "/ibc.applications.transfer.v1.MsgTransfer",
@@ -453,8 +453,9 @@
 					memo: pfm_memo,
 				}),
 			};
+			console.log(transferMsg)
 
-			from_client.signAndBroadcast(addr, [transferMsg], { amount: [], gas: gas.toString() }, `ibc.reece.sh | ${pfm_memo}`).then((tx) => {
+			from_client.signAndBroadcast(addr, [transferMsg], { amount: [], gas: gas.toString() }, `ibc.reece.sh | ${chain.pretty_name} -> ${to_chain.pretty_name} (PFM) -> ${pfm_chain.pretty_name}`).then((tx) => {
 				console.log(tx);
 				if (tx.code == 0) {
 					toast.success(
@@ -476,7 +477,7 @@
 				undefined,
 				timeout_time,
 				{ amount: [], gas: gas.toString() },
-				`ibc.reece.sh | from ${chain.pretty_name} to ${to_chain.pretty_name}`
+				`ibc.reece.sh | ${chain.pretty_name} -> ${to_chain.pretty_name}`
 			)
 			.then((tx) => {
 				console.log(tx);
@@ -573,6 +574,8 @@
 			{/each}
 		</ul>
 		
+		<input type="submit" value="(Advanced) Toggle Denom Format" on:click={() => toggle_divisor()} />
+		<br>
 		<input type="number" placeholder="Amount" bind:value={ibc_amount} />				
 
 		<!-- create a select input box of list denoms -->
@@ -590,38 +593,31 @@
 		</select>
 
 		<!-- create a button which when clicked, toggles divisor -->
-		<br>
-		<input type="submit" value="(Advanced) Toggle Denom Format" on:click={() => toggle_divisor()} />		
-
-		<br>		
-
-		<input type="submit" value="Packet Forward Middleware" on:click={() => togglePFMUsage()} />
+		<br>			
+		<input type="submit" value="Use Packet Forward Middleware" on:click={() => togglePFMUsage()} />
 
 		{#if usePFM}
-			<p>PFM Middle Chain</p>
-			<input type="text" placeholder="MiddleWare chain" list="chain_names" bind:value={to_chain_input} />			
-		{:else}
-			<h4>To Chain</h4>
-			<input type="text" placeholder="To chain-id" list="chain_names" bind:value={to_chain_input} />
-		{/if}		
-		
-
-		<!-- if usePFM is true, show an input job for the destination chain -->
-		{#if usePFM}
+			<h4>PFM Passthrough Chain</h4>
+			<input type="text" placeholder="Middlware Passthrough Chain-ID" list="chain_names" bind:value={to_chain_input} />	
+			
 			<br>
-			<input type="text" placeholder="Final destination Chain" list="chain_names" bind:value={pfm_chain_input} />			
+			<h4>Destination Chain</h4>
+			<input type="text" placeholder="Final Chain-ID" list="chain_names" bind:value={pfm_chain_input} />			
 			<input type="submit" value="Get Wallet Address" on:click={() => 				
 				get_pfm_wallet()		
 			} />
-		{/if}
 
-		<!-- if pfm_wallet is set, show it -->
-		{#if pfmWalletAddr !== undefined}
-			<p>PFM Wallet Address: {pfmWalletAddr}</p>
+			<!-- if pfm_wallet is set, show it -->
+			{#if pfmWalletAddr !== undefined}
+				<p>Destination Address: {pfmWalletAddr}</p>
+			{/if}
+		{:else}
+			<h4>Destination Chain</h4>
+			<input type="text" placeholder="Destination chain-id" list="chain_names" bind:value={to_chain_input} />
 		{/if}
 
 		<br>
-		<input type="submit" on:click={() => ibc_transfer()} />
+		<input type="submit" name="Submit IBC Tx" on:click={() => ibc_transfer()} />
 
 	</div>
 
@@ -655,7 +651,7 @@
 		padding: 24px;
 		margin-top: 1%;
 		border-radius: 16px;
-		width: 600px;
+		width: 40%;
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
