@@ -15,7 +15,7 @@
 	import type { Window as KeplrWindow } from '@keplr-wallet/types';
 
 	import type { Coin } from 'cosmjs-types/cosmos/base/v1beta1/coin';
-	import { SigningStargateClient } from '@cosmjs/stargate';
+	import { SigningStargateClient, type MsgTransferEncodeObject } from '@cosmjs/stargate';
 
 	// Signing (Keplr & Ledger)
 	import type { OfflineAminoSigner } from '@cosmjs/amino';
@@ -26,13 +26,16 @@
 	import { setupIbcExtension, QueryClient } from '@cosmjs/stargate';
 	import type { DenomTrace } from '@cosmjs/stargate/node_modules/cosmjs-types/ibc/applications/transfer/v1/transfer';
 	import type {IbcExtension} from '@cosmjs/stargate/build/modules/ibc/queries';
+	import { MsgTransfer } from "cosmjs-types/ibc/applications/transfer/v1/tx";
 
 	// notifications
 	import toast, { Toaster, type ToastOptions } from 'svelte-french-toast';    	
 
 	// https://github.com/cosmology-tech/chain-registry/blob/main/packages/assets/src/asset_lists.ts	
 	// Can't find module even though its the same for the fork?
-	import { assets, chains, ibc } from '../chain-registry';
+	import { assets, chains, ibc } from '../chain-registry';	
+	import type { Chain } from '@chain-registry/types';
+	import Long from 'long';
 
 	// This does not work for Failed to load url?
 	// import assets from '../../node_modules/chain-registry/packages/chain-registry/types/assets';	
@@ -40,8 +43,7 @@
 	// import ibc from '../../node_modules/chain-registry/packages/chain-registry/types/ibc';
 
 	// Since RPCs are Ass, force use mine which ACTUALLY HAS CORS ENABLED AND LETS ME DEVELOP
-	const JUNO_RPC = "https://juno-rpc.reece.sh"
-	const CANTO_RPC = "https://canto-rpc.reece.sh"
+	const JUNO_RPC = "https://juno-rpc.reece.sh"	
 
 	let divisor = 10**6;
 	let toggle_divisor = () => {
@@ -51,6 +53,11 @@
 		} else {
 			divisor = 10**6;
 		}
+	}
+
+	let usePFM = false;
+	let togglePFMUsage = () => {
+		usePFM = !usePFM
 	}
 
 	const toast_style: ToastOptions = {
@@ -70,6 +77,9 @@
 
 	let chain_input: string;
 	let to_chain_input: string;
+	let pfm_chain_input: string;
+	
+	let pfmWalletAddr: string;
 	
 	let balances: Balance[] = [];
 
@@ -86,8 +96,6 @@
 		let rpcs: any;
 		if(chain_id === "juno-1") {
 			rpcs = [{address: JUNO_RPC}, {address: "https://rpc.juno.strange.love/"}, ...chain_rpc]
-		} else if (chain_id === "canto_7700-1") {
-			rpcs = [{address: CANTO_RPC}, ...chain_rpc]
 		} else {
 			rpcs = chain_rpc
 		}
@@ -116,7 +124,7 @@
 		// try 10 different endpoints max
 		for (let i = 0; i < 10; i++) {
 			try {
-				const tm_client = await Tendermint34Client.connect(chain_rpc[i].address);		
+				const tm_client: Tendermint34Client = await Tendermint34Client.connect(chain_rpc[i].address);		
 				let temp = QueryClient.withExtensions(tm_client);
 				query_client = setupIbcExtension(temp);
 				break;
@@ -151,6 +159,36 @@
 
 		return signer(chain_id);
 	};
+
+	const get_pfm_wallet = async () => {
+		// get wallet for pfm_chain
+		if (pfm_chain_input === undefined) {
+			toast.error(`PFM chain not selected`, toast_style);
+			throw new Error('PFM chain not found');
+		}
+
+		// open keplr
+		const keplr = window as KeplrWindow;
+
+		if (keplr === undefined) {
+			toast.error(`Keplr not found`, toast_style);
+			throw new Error('Keplr not found');
+		}
+
+		let signer = keplr.getOfflineSignerAuto;
+
+		if (signer === undefined) {
+			throw new Error('Keplr not found');
+		}
+
+		let wallet = await signer(pfm_chain_input);
+		let accounts = await wallet.getAccounts()
+		if (accounts === undefined) {
+			throw new Error('Keplr not found');
+		}
+		
+		pfmWalletAddr = accounts[0].address;
+	}
 
 	const get_ibc_denom_human_readable = async (chain_id: string, ibc_trace: string): Promise<DenomTrace | undefined> => {		
 		if (ibc_trace !== undefined && (!ibc_trace.startsWith('ibc/'))) {
@@ -193,9 +231,12 @@
 		// try 10 different endpoints max
 		for (let i = 0; i < 10; i++) {
 			try {
-				from_client = await SigningStargateClient.connectWithSigner(chain_rpc[i].address, wallet, {
-					prefix: chain.bech32_prefix
-				});
+
+				// let opts = {
+				// 	prefix: chain.bech32_prefix
+				// }
+
+				from_client = await SigningStargateClient.connectWithSigner(chain_rpc[i].address, wallet);
 				await from_client.getAllBalances((await wallet.getAccounts())[0].address); // ensures it works correctly
 				break;
 			} catch (error) {
@@ -334,6 +375,9 @@
 			throw new Error('Chain not found');
 		}
 
+		const pfm_chain: Chain | undefined = chains.find((chain) => chain.chain_id === pfm_chain_input);
+		
+
 		let chain_rpc = chain.apis?.rpc;
 		let to_chain_rpc = to_chain.apis?.rpc;
 		if (chain_rpc === undefined || to_chain_rpc === undefined) {
@@ -376,8 +420,54 @@
 			throw new Error('No denom selected');
 		}
 
-		from_client
-			.sendIbcTokens(
+		if(usePFM) {
+			if (pfm_chain === undefined) {
+				toast.error(`PFM chain ${pfm_chain} not found`, toast_style);
+				throw new Error('Chain not found');
+			}
+
+			let timeoutTimestamp = timeout_time;	
+			
+			const to_final_channel = get_channel(to_chain.chain_name, pfm_chain.chain_name); // ex: channel-141
+			if(to_final_channel === undefined) {
+				toast.error(`There is no IBC channel for ${to_chain.chain_name} -> ${pfm_chain.chain_name} with version ${channel_version} and port_id ${port_id}`, toast_style);
+				throw new Error('Channel not found for PFM');
+			}
+
+			const timeoutTimestampNanoseconds = timeoutTimestamp
+			? Long.fromNumber(timeoutTimestamp).multiply(1_000_000_000)
+			: undefined;
+
+			let pfm_memo: string = `{"forward":{"receiver":${pfmWalletAddr},"port":"transfer","channel":${to_final_channel}}}`
+			alert(pfm_memo)
+
+			const transferMsg: MsgTransferEncodeObject = {
+				typeUrl: "/ibc.applications.transfer.v1.MsgTransfer",
+				value: MsgTransfer.fromPartial({
+					sourcePort: port_id,
+					sourceChannel: channel_id,
+					sender: addr,
+					receiver: to_wallet_addr,
+					token: { denom: ibc_denom, amount: actual_amount.toString() },					
+					timeoutTimestamp: timeoutTimestampNanoseconds,
+					memo: pfm_memo,
+				}),
+			};
+
+			from_client.signAndBroadcast(addr, [transferMsg], { amount: [], gas: gas.toString() }, `ibc.reece.sh | ${pfm_memo}`).then((tx) => {
+				console.log(tx);
+				if (tx.code == 0) {
+					toast.success(
+						`IBC transfer from ${chain.pretty_name} successful\n\nTxHash: ${tx.transactionHash}`,
+						toast_style
+					);
+				}				
+			})			
+			.catch((err) => {
+				toast.error(`${err}`, toast_style);
+			});;
+		} else {
+			from_client.sendIbcTokens(
 				addr,
 				to_wallet_addr,
 				{ denom: ibc_denom, amount: actual_amount.toString() },
@@ -399,7 +489,8 @@
 			})			
 			.catch((err) => {
 				toast.error(`${err}`, toast_style);
-			});        
+			});
+		}
 	};
 </script>
 
@@ -500,11 +591,38 @@
 
 		<!-- create a button which when clicked, toggles divisor -->
 		<br>
-		<input type="submit" value="(Advanced) Toggle Denom Format" on:click={() => toggle_divisor()} />
+		<input type="submit" value="(Advanced) Toggle Denom Format" on:click={() => toggle_divisor()} />		
 
-		<h4>To Chain</h4>
-		<input type="text" placeholder="to chain-id" list="chain_names" bind:value={to_chain_input} />
+		<br>		
+
+		<input type="submit" value="Packet Forward Middleware" on:click={() => togglePFMUsage()} />
+
+		{#if usePFM}
+			<p>PFM Middle Chain</p>
+			<input type="text" placeholder="MiddleWare chain" list="chain_names" bind:value={to_chain_input} />			
+		{:else}
+			<h4>To Chain</h4>
+			<input type="text" placeholder="To chain-id" list="chain_names" bind:value={to_chain_input} />
+		{/if}		
+		
+
+		<!-- if usePFM is true, show an input job for the destination chain -->
+		{#if usePFM}
+			<br>
+			<input type="text" placeholder="Final destination Chain" list="chain_names" bind:value={pfm_chain_input} />			
+			<input type="submit" value="Get Wallet Address" on:click={() => 				
+				get_pfm_wallet()		
+			} />
+		{/if}
+
+		<!-- if pfm_wallet is set, show it -->
+		{#if pfmWalletAddr !== undefined}
+			<p>PFM Wallet Address: {pfmWalletAddr}</p>
+		{/if}
+
+		<br>
 		<input type="submit" on:click={() => ibc_transfer()} />
+
 	</div>
 
 	<div id="successful_txs" style="display: none;" class="div_center">
